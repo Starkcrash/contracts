@@ -4,12 +4,12 @@ use core::traits::TryInto;
 
 use snforge_std::{
     declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-    stop_cheat_caller_address, store, map_entry_address
+    stop_cheat_caller_address, store, map_entry_address,
 };
 
 use crash_contracts::crashgame::crashgame::{
     ICrashGameDispatcher, ICrashGameDispatcherTrait, IManagementDispatcher,
-    IManagementDispatcherTrait
+    IManagementDispatcherTrait,
 };
 use crash_contracts::types::GameState;
 use crash_contracts::crashgame::errors::Errors;
@@ -36,7 +36,6 @@ fn PLAYER_ADDRESS() -> ContractAddress {
 }
 
 const ONE_ETH: u128 = 1_000_000_000_000_000_000;
-const CASINO_FEE_BASIS_POINTS: u256 = 400;
 const BASIS_POINTS: u256 = 10000;
 
 fn deploy_contract() -> ContractAddress {
@@ -61,13 +60,17 @@ fn deploy_erc20() -> ContractAddress {
     contract_address
 }
 
-fn setup_start_betting() -> (ICrashGameDispatcher, felt252, felt252) {
+fn setup_start_betting() -> (ICrashGameDispatcher, IManagementDispatcher, felt252, felt252) {
     // Deploy with caller as operator
     let contract_address = deploy_contract();
     let dispatcher = ICrashGameDispatcher { contract_address };
     let management_dispatcher = IManagementDispatcher { contract_address };
     let seed_hash = 447081709482894523534661633867505801754022196930481080379856883095486108589;
     let secret_seed = 357603085394972;
+
+    start_cheat_caller_address(contract_address, OPERATOR_ADDRESS());
+    management_dispatcher.set_casino_fee_basis_points(400);
+    stop_cheat_caller_address(contract_address);
 
     start_cheat_caller_address(contract_address, OPERATOR_ADDRESS());
     dispatcher.commit_seed(seed_hash);
@@ -77,7 +80,7 @@ fn setup_start_betting() -> (ICrashGameDispatcher, felt252, felt252) {
     dispatcher.start_betting();
     stop_cheat_caller_address(contract_address);
 
-    (dispatcher, seed_hash, secret_seed)
+    (dispatcher, management_dispatcher, seed_hash, secret_seed)
 }
 
 #[test]
@@ -92,6 +95,7 @@ fn test_constructor() {
 
     assert(management_dispatcher.get_operator() == OPERATOR_ADDRESS(), 'Wrong operator');
     assert(management_dispatcher.get_max_bet() == 1_000_000_000_000_000_0, 'Wrong max bet');
+    assert(management_dispatcher.get_casino_fee() == 0, 'Wrong casino fee');
 }
 
 
@@ -141,7 +145,7 @@ fn test_start_betting_fail_not_committed() {
 
 #[test]
 fn test_start_game() {
-    let (dispatcher, _, _) = setup_start_betting();
+    let (dispatcher, _, _, _) = setup_start_betting();
 
     start_cheat_caller_address(dispatcher.contract_address, OPERATOR_ADDRESS());
     dispatcher.start_game();
@@ -154,7 +158,7 @@ fn test_start_game() {
 
 #[test]
 fn test_end_game() {
-    let (dispatcher, _, secret_seed) = setup_start_betting();
+    let (dispatcher, _, _, secret_seed) = setup_start_betting();
 
     start_cheat_caller_address(dispatcher.contract_address, OPERATOR_ADDRESS());
     dispatcher.start_game();
@@ -175,7 +179,7 @@ fn test_end_game() {
 #[fork(url: "https://starknet-sepolia.public.blastapi.io/rpc/v0_7", block_tag: latest)]
 fn test_place_bet() {
     // Setup initial game state
-    let (dispatcher, _, _) = setup_start_betting();
+    let (dispatcher, management, _, _) = setup_start_betting();
     let game_id = dispatcher.get_current_game();
     let amount: u128 = 1000000000000000;
     let amount_u256: u256 = amount.into();
@@ -189,7 +193,7 @@ fn test_place_bet() {
             selector!("ERC20_balances"), // Providing variable name
             array![player.into()].span() // Providing mapping key
         ),
-        array![amount.into() * 2].span()
+        array![amount.into() * 2].span(),
     );
     let bal_player_before = eth.balance_of(player);
     assert(bal_player_before == (amount * 2).into(), 'Player balance mismatch');
@@ -216,15 +220,16 @@ fn test_place_bet() {
 
     let bal_contract = eth.balance_of(dispatcher.contract_address);
     assert(
-        bal_contract == (amount_u256 - amount_u256 * CASINO_FEE_BASIS_POINTS / BASIS_POINTS).into(),
-        'Contract balance mismatch'
+        bal_contract == (amount_u256 - amount_u256 * management.get_casino_fee() / BASIS_POINTS)
+            .into(),
+        'Contract balance mismatch',
     );
 
     // Check casino fee
     let bal_casino = eth.balance_of(CASINO_ADDRESS());
     assert(
-        bal_casino == (amount_u256 * CASINO_FEE_BASIS_POINTS / BASIS_POINTS).into(),
-        'Casino fee mismatch'
+        bal_casino == (amount_u256 * management.get_casino_fee() / BASIS_POINTS).into(),
+        'Casino fee mismatch',
     );
 
     start_cheat_caller_address(eth.contract_address, player);
@@ -245,7 +250,7 @@ fn test_place_bet() {
 #[should_panic(expected: 'Bet amount exceeds max bet')]
 fn test_place_bet_fail_max_bet() {
     // Setup initial game state
-    let (dispatcher, _, _) = setup_start_betting();
+    let (dispatcher, _, _, _) = setup_start_betting();
     let game_id = dispatcher.get_current_game();
     let amount: u128 = 1_000_000_000_000_000_000;
     let amount_u256: u256 = amount.into();
@@ -259,7 +264,7 @@ fn test_place_bet_fail_max_bet() {
             selector!("ERC20_balances"), // Providing variable name
             array![player.into()].span() // Providing mapping key
         ),
-        array![amount.into() * 2].span()
+        array![amount.into() * 2].span(),
     );
     let bal_player_before = eth.balance_of(player);
     assert(bal_player_before == (amount * 2).into(), 'Player balance mismatch');
@@ -282,7 +287,7 @@ fn test_place_bet_fail_max_bet() {
 #[fork(url: "https://starknet-sepolia.public.blastapi.io/rpc/v0_7", block_tag: latest)]
 fn test_cashout() {
     // Setup initial game state
-    let (dispatcher, _, secret_seed) = setup_start_betting();
+    let (dispatcher, management, _, secret_seed) = setup_start_betting();
     let game_id = dispatcher.get_current_game();
     let amount: u128 = 1000000000000000;
     let amount_u256: u256 = amount.into();
@@ -296,7 +301,7 @@ fn test_cashout() {
         map_entry_address(
             selector!("ERC20_balances"), array![player.into()].span() // Providing mapping key
         ),
-        array![amount.into()].span()
+        array![amount.into()].span(),
     );
     store(
         eth.contract_address,
@@ -304,7 +309,7 @@ fn test_cashout() {
             selector!("ERC20_balances"),
             array![dispatcher.contract_address.into()].span() // Providing mapping key
         ),
-        array![ONE_ETH.into()].span()
+        array![ONE_ETH.into()].span(),
     );
     start_cheat_caller_address(eth.contract_address, player);
     eth.approve(dispatcher.contract_address, amount.into());
@@ -329,17 +334,17 @@ fn test_cashout() {
     stop_cheat_caller_address(dispatcher.contract_address);
     let bal_player_after = eth.balance_of(player);
     assert(
-        bal_player_after == (amount.into() * multiplier / BASIS_POINTS), 'Player balance mismatch'
+        bal_player_after == (amount.into() * multiplier / BASIS_POINTS), 'Player balance mismatch',
     );
 
     let bal_contract = eth.balance_of(dispatcher.contract_address);
-    let casino_fee = amount_u256 * CASINO_FEE_BASIS_POINTS / BASIS_POINTS;
+    let casino_fee = amount_u256 * management.get_casino_fee() / BASIS_POINTS;
 
     assert(
         bal_contract == (ONE_ETH.into()
             - (amount.into() * multiplier / 10000 - amount.into())
             - casino_fee),
-        'Contract balance mismatch'
+        'Contract balance mismatch',
     );
 }
 
@@ -348,7 +353,7 @@ fn test_cashout() {
 #[should_panic(expected: 'Caller is not the owner')]
 fn test_cashout_fail() {
     // Setup initial game state
-    let (dispatcher, _, secret_seed) = setup_start_betting();
+    let (dispatcher, _, _, secret_seed) = setup_start_betting();
     let game_id = dispatcher.get_current_game();
     let amount: u128 = 1000000000000000;
     let amount_u256: u256 = amount.into();
@@ -361,7 +366,7 @@ fn test_cashout_fail() {
         map_entry_address(
             selector!("ERC20_balances"), array![player.into()].span() // Providing mapping key
         ),
-        array![amount.into() * 2].span()
+        array![amount.into() * 2].span(),
     );
     start_cheat_caller_address(eth.contract_address, player);
     eth.approve(dispatcher.contract_address, amount.into());
@@ -390,7 +395,7 @@ fn test_cashout_fail() {
 #[should_panic(expected: 'Already processed')]
 fn test_cashout_fail_already_processed() {
     // Setup initial game state
-    let (dispatcher, _, secret_seed) = setup_start_betting();
+    let (dispatcher, _, _, secret_seed) = setup_start_betting();
     let game_id = dispatcher.get_current_game();
     let amount: u128 = 1000000000000000;
     let amount_u256: u256 = amount.into();
@@ -403,7 +408,7 @@ fn test_cashout_fail_already_processed() {
         map_entry_address(
             selector!("ERC20_balances"), array![player.into()].span() // Providing mapping key
         ),
-        array![amount.into() * 2].span()
+        array![amount.into() * 2].span(),
     );
     store(
         eth.contract_address,
@@ -411,7 +416,7 @@ fn test_cashout_fail_already_processed() {
             selector!("ERC20_balances"),
             array![dispatcher.contract_address.into()].span() // Providing mapping key
         ),
-        array![ONE_ETH.into()].span()
+        array![ONE_ETH.into()].span(),
     );
 
     start_cheat_caller_address(eth.contract_address, player);
