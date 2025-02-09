@@ -25,7 +25,6 @@ pub trait IManagement<TContractState> {
     fn set_casino_address(ref self: TContractState, casino_address: ContractAddress);
     fn get_max_amount_of_bets(self: @TContractState) -> u8;
     fn set_max_amount_of_bets(ref self: TContractState, max_amount_of_bets: u8);
-    fn get_operator(self: @TContractState) -> ContractAddress;
     fn set_operator(ref self: TContractState, operator: ContractAddress);
     fn get_casino_fee(self: @TContractState) -> u256;
     fn set_casino_fee_basis_points(ref self: TContractState, casino_fee_basis_points: u256);
@@ -417,10 +416,6 @@ pub mod CrashGame {
 
     #[abi(embed_v0)]
     impl IManagementImpl of IManagement<ContractState> {
-        fn get_operator(self: @ContractState) -> ContractAddress {
-            self.ownable.owner()
-        }
-
         fn get_max_bet(self: @ContractState) -> u256 {
             self.max_bet.read()
         }
