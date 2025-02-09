@@ -7,7 +7,7 @@ source ../.env
 echo "Declaring contract..."
 DECLARE_OUTPUT=$(sncast --account $ACCOUNT_NAME declare \
   --url "$RPC_URL" \
-  --fee-token eth \
+  --fee-token "$FEE_TOKEN" \
   --contract-name CrashGame)
 
 # Extract class hash

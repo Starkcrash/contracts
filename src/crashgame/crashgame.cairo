@@ -82,7 +82,6 @@ pub mod CrashGame {
         processed: Map::<(u64, ContractAddress), bool>,
         current_game_id: u64,
         game_states: Map::<u64, GameState>,
-        game_seeds: Map::<u64, felt252>,
         total_bets: Map::<u64, u256>,
         committed_seeds: Map::<u64, felt252>,
         revealed_seeds: Map::<u64, felt252>,
@@ -105,7 +104,6 @@ pub mod CrashGame {
         GameStarted: GameStarted,
         GameEnded: GameEnded,
         CasinoCut: CasinoCut,
-        CasinoCutUpdate: CasinoCutUpdate,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -140,12 +138,6 @@ pub mod CrashGame {
         game_id: u64,
         amount: u256,
     }
-
-    #[derive(Drop, starknet::Event)]
-    struct CasinoCutUpdate {
-        new_amount: u256,
-    }
-
 
     #[constructor]
     fn constructor(
@@ -455,7 +447,6 @@ pub mod CrashGame {
             self.ownable.assert_only_owner();
             assert(casino_fee_basis_points <= 600, 'Casino fee must be <= 600');
             self.casino_fee_basis_points.write(casino_fee_basis_points);
-            self.emit(CasinoCutUpdate { new_amount: casino_fee_basis_points });
         }
 
         fn set_operator(ref self: ContractState, operator: ContractAddress) {

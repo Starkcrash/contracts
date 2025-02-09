@@ -9,7 +9,7 @@ INVOKE_OUTPUT=$(sncast --account $ACCOUNT_NAME invoke \
     --contract-address "$CONTRACT_ADDRESS" \
     --function "set_operator" \
     --calldata "$OPERATOR_ADDRESS" \
-    --fee-token eth)
+    --fee-token "$FEE_TOKEN")
 
 # Extract transaction hash
 TX_HASH=$(echo "$INVOKE_OUTPUT" | grep "transaction_hash:" | awk '{print $2}')

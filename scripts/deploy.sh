@@ -7,7 +7,7 @@ source ../.env
 echo "Deploying contract..."
 DEPLOY_OUTPUT=$(sncast --account $ACCOUNT_NAME deploy \
   --url "$RPC_URL" \
-  --fee-token eth \
+  --fee-token "$FEE_TOKEN" \
   --class-hash $CLASS_HASH \
   --constructor-calldata $OPERATOR_ADDRESS $CASINO_ADDRESS)
 
