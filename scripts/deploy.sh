@@ -7,7 +7,7 @@ source ../.env
 echo "Deploying contract..."
 DEPLOY_OUTPUT=$(sncast --account $ACCOUNT_NAME deploy \
   --url "$RPC_URL" \
-  --fee-token eth \
+  --fee-token "$FEE_TOKEN" \
   --class-hash $CLASS_HASH \
   --constructor-calldata $OPERATOR_ADDRESS $CASINO_ADDRESS)
 
@@ -15,6 +15,19 @@ DEPLOY_OUTPUT=$(sncast --account $ACCOUNT_NAME deploy \
 CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "contract_address:" | awk '{print $2}')
 
 echo "Contract deployed at address: $CONTRACT_ADDRESS"
+
+# Update the contract address in .env
+if [ -n "$CONTRACT_ADDRESS" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        sed -i '' "s|CONTRACT_ADDRESS=.*|CONTRACT_ADDRESS=\"$CONTRACT_ADDRESS\"|" ../.env
+    else
+        # Linux and others
+        sed -i "s|CONTRACT_ADDRESS=.*|CONTRACT_ADDRESS=\"$CONTRACT_ADDRESS\"|" ../.env
+    fi
+    echo "Updated contract address in .env"
+fi
+
 
 # Save deployment info with history
 if [ -f deploy-info.json ]; then

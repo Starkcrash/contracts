@@ -7,7 +7,7 @@ source ../.env
 echo "Declaring contract..."
 DECLARE_OUTPUT=$(sncast --account $ACCOUNT_NAME declare \
   --url "$RPC_URL" \
-  --fee-token eth \
+  --fee-token "$FEE_TOKEN" \
   --contract-name CrashGame)
 
 # Extract class hash
@@ -19,10 +19,10 @@ echo "Contract declared with class hash: $NEW_CLASS_HASH"
 if [ -n "$NEW_CLASS_HASH" ]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS
-        sed -i '' 's/CLASS_HASH="0x[0-9a-fA-F]*"/CLASS_HASH="'"$NEW_CLASS_HASH"'"/' ../.env
+        sed -i '' "s|CLASS_HASH=.*|CLASS_HASH=\"$NEW_CLASS_HASH\"|" ../.env
     else
         # Linux and others
-        sed -i 's/CLASS_HASH="0x[0-9a-fA-F]*"/CLASS_HASH="'"$NEW_CLASS_HASH"'"/' ../.env
+        sed -i "s|CLASS_HASH=.*|CLASS_HASH=\"$NEW_CLASS_HASH\"|" ../.env
     fi
     echo "Updated class hash in .env"
 fi

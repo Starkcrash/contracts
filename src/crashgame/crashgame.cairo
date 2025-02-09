@@ -10,7 +10,7 @@ pub trait ICrashGame<TContractState> {
     fn end_game(ref self: TContractState, seed: felt252);
     fn place_bet(ref self: TContractState, game_id: u64, amount: u256);
     fn process_cashout(
-        ref self: TContractState, game_id: u64, player: ContractAddress, multiplier: u256
+        ref self: TContractState, game_id: u64, player: ContractAddress, multiplier: u256,
     );
     fn start_betting(ref self: TContractState);
     fn commit_seed(ref self: TContractState, seed_hash: felt252);
@@ -25,8 +25,9 @@ pub trait IManagement<TContractState> {
     fn set_casino_address(ref self: TContractState, casino_address: ContractAddress);
     fn get_max_amount_of_bets(self: @TContractState) -> u8;
     fn set_max_amount_of_bets(ref self: TContractState, max_amount_of_bets: u8);
-    fn get_operator(self: @TContractState) -> ContractAddress;
     fn set_operator(ref self: TContractState, operator: ContractAddress);
+    fn get_casino_fee(self: @TContractState) -> u256;
+    fn set_casino_fee_basis_points(ref self: TContractState, casino_fee_basis_points: u256);
 }
 
 #[starknet::contract]
@@ -52,7 +53,6 @@ pub mod CrashGame {
 
     // CONSTANTS
     const ETH_ADDRESS: felt252 = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7;
-    const CASINO_FEE_BASIS_POINTS: u256 = 400; // 4% = 400 basis points
     const BASIS_POINTS: u256 = 10000;
 
     // Ownable Mixin
@@ -81,12 +81,12 @@ pub mod CrashGame {
         processed: Map::<(u64, ContractAddress), bool>,
         current_game_id: u64,
         game_states: Map::<u64, GameState>,
-        game_seeds: Map::<u64, felt252>,
         total_bets: Map::<u64, u256>,
         committed_seeds: Map::<u64, felt252>,
         revealed_seeds: Map::<u64, felt252>,
         max_bet: u256,
-        max_amount_of_bets: u8
+        max_amount_of_bets: u8,
+        casino_fee_basis_points: u256,
     }
 
     #[event]
@@ -138,16 +138,16 @@ pub mod CrashGame {
         amount: u256,
     }
 
-
     #[constructor]
     fn constructor(
-        ref self: ContractState, operator: ContractAddress, casino_address: ContractAddress
+        ref self: ContractState, operator: ContractAddress, casino_address: ContractAddress,
     ) {
         self.ownable.initializer(operator);
         self.casino_address.write(casino_address);
         self.game_states.write(0, GameState::Transition);
         self.max_bet.write(1_000_000_000_000_000_0); // 0.01 ETH by default
         self.max_amount_of_bets.write(2);
+        self.casino_fee_basis_points.write(0);
     }
 
     #[generate_trait]
@@ -204,7 +204,7 @@ pub mod CrashGame {
         fn get_seed(self: @ContractState, game_id: u64) -> felt252 {
             assert(
                 self.game_states.read(game_id) == GameState::Crashed,
-                Errors::GAME_NOT_IN_CRASHED_STATE
+                Errors::GAME_NOT_IN_CRASHED_STATE,
             );
             self.revealed_seeds.read(game_id)
         }
@@ -236,7 +236,7 @@ pub mod CrashGame {
             let game_id = self.current_game_id.read();
             assert(
                 self.game_states.read(game_id) == GameState::Transition,
-                Errors::GAME_NOT_IN_TRANSITION_STATE
+                Errors::GAME_NOT_IN_TRANSITION_STATE,
             );
             assert(self.committed_seeds.read(game_id) == 0, Errors::ALREADY_COMMITTED_SEED);
             self.game_states.write(game_id, GameState::CommittedSeed);
@@ -258,7 +258,7 @@ pub mod CrashGame {
             let game_id = self.current_game_id.read();
             assert(
                 self.game_states.read(game_id) == GameState::CommittedSeed,
-                Errors::GAME_NOT_IN_COMMITTED_SEED_STATE
+                Errors::GAME_NOT_IN_COMMITTED_SEED_STATE,
             );
             assert(self.committed_seeds.read(game_id) != 0, Errors::NO_COMMITTED_SEED);
 
@@ -281,7 +281,7 @@ pub mod CrashGame {
 
             assert(
                 self.game_states.read(game_id) == GameState::Betting,
-                Errors::GAME_NOT_IN_BETTING_STATE
+                Errors::GAME_NOT_IN_BETTING_STATE,
             );
 
             let seed_hash = self.committed_seeds.read(game_id);
@@ -309,7 +309,7 @@ pub mod CrashGame {
             let game_id = self.current_game_id.read();
             assert(
                 self.game_states.read(game_id) == GameState::Playing,
-                Errors::GAME_NOT_IN_PLAYING_STATE
+                Errors::GAME_NOT_IN_PLAYING_STATE,
             );
 
             let committed_hash = self.committed_seeds.read(game_id);
@@ -352,14 +352,14 @@ pub mod CrashGame {
             // Verify game state
             assert(
                 self.game_states.read(game_id) == GameState::Betting,
-                Errors::GAME_NOT_IN_BETTING_STATE
+                Errors::GAME_NOT_IN_BETTING_STATE,
             );
 
             let existing_bet = self.player_bets.read((game_id, player));
             let total_bet = existing_bet + amount;
             assert(
                 total_bet <= self.max_bet.read() * self.max_amount_of_bets.read().into(),
-                Errors::TOTAL_BET_EXCEEDS_MAX_BET
+                Errors::TOTAL_BET_EXCEEDS_MAX_BET,
             );
             // Store bet
             self.player_bets.write((game_id, player), total_bet);
@@ -375,7 +375,7 @@ pub mod CrashGame {
 
             // Casino cut
             let casino_address = self.casino_address.read();
-            let casino_fee = (amount * CASINO_FEE_BASIS_POINTS) / BASIS_POINTS;
+            let casino_fee = (amount * self.casino_fee_basis_points.read()) / BASIS_POINTS;
             eth.transfer(casino_address, casino_fee);
 
             self.emit(BetPlaced { game_id, player, amount });
@@ -396,7 +396,7 @@ pub mod CrashGame {
         /// * Transfers payout amount to player
         /// * Emits CashoutProcessed event
         fn process_cashout(
-            ref self: ContractState, game_id: u64, player: ContractAddress, multiplier: u256
+            ref self: ContractState, game_id: u64, player: ContractAddress, multiplier: u256,
         ) {
             self.ownable.assert_only_owner();
             assert(multiplier > 10000, 'Multiplier must be > than 1');
@@ -416,16 +416,16 @@ pub mod CrashGame {
 
     #[abi(embed_v0)]
     impl IManagementImpl of IManagement<ContractState> {
-        fn get_operator(self: @ContractState) -> ContractAddress {
-            self.ownable.owner()
-        }
-
         fn get_max_bet(self: @ContractState) -> u256 {
             self.max_bet.read()
         }
 
         fn get_max_amount_of_bets(self: @ContractState) -> u8 {
             self.max_amount_of_bets.read()
+        }
+
+        fn get_casino_fee(self: @ContractState) -> u256 {
+            self.casino_fee_basis_points.read()
         }
 
         fn set_max_bet(ref self: ContractState, max_bet: u256) {
@@ -436,6 +436,12 @@ pub mod CrashGame {
         fn set_max_amount_of_bets(ref self: ContractState, max_amount_of_bets: u8) {
             self.ownable.assert_only_owner();
             self.max_amount_of_bets.write(max_amount_of_bets)
+        }
+
+        fn set_casino_fee_basis_points(ref self: ContractState, casino_fee_basis_points: u256) {
+            self.ownable.assert_only_owner();
+            assert(casino_fee_basis_points <= 600, 'Casino fee must be <= 600');
+            self.casino_fee_basis_points.write(casino_fee_basis_points);
         }
 
         fn set_operator(ref self: ContractState, operator: ContractAddress) {
