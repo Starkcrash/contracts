@@ -1,5 +1,4 @@
 target
 .snfoundry_cache/
 .env
-scripts/deploy-info.json
-scripts/declare-info.json
+scripts/**/*.json
