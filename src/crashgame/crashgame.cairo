@@ -25,9 +25,10 @@ pub trait IManagement<TContractState> {
     fn set_casino_address(ref self: TContractState, casino_address: ContractAddress);
     fn get_max_amount_of_bets(self: @TContractState) -> u8;
     fn set_max_amount_of_bets(ref self: TContractState, max_amount_of_bets: u8);
-    fn set_operator(ref self: TContractState, operator: ContractAddress);
     fn get_casino_fee(self: @TContractState) -> u256;
     fn set_casino_fee_basis_points(ref self: TContractState, casino_fee_basis_points: u256);
+    fn get_min_bet(self: @TContractState) -> u256;
+    fn set_min_bet(ref self: TContractState, min_bet: u256);
 }
 
 #[starknet::contract]
@@ -87,6 +88,7 @@ pub mod CrashGame {
         max_bet: u256,
         max_amount_of_bets: u8,
         casino_fee_basis_points: u256,
+        min_bet: u256,
     }
 
     #[event]
@@ -148,6 +150,7 @@ pub mod CrashGame {
         self.max_bet.write(1_000_000_000_000_000_0); // 0.01 ETH by default
         self.max_amount_of_bets.write(2);
         self.casino_fee_basis_points.write(0);
+        self.min_bet.write(100_000_000_000_000); // 0.00001 ETH by default
     }
 
     #[generate_trait]
@@ -345,6 +348,8 @@ pub mod CrashGame {
         /// * Emits BetPlaced and CasinoCut events
         fn place_bet(ref self: ContractState, game_id: u64, amount: u256) {
             assert(amount <= self.max_bet.read(), Errors::AMOUNT_EXCEEDS_MAX_BET);
+            assert(amount >= self.min_bet.read(), Errors::AMOUNT_BELOW_MIN_BET);
+
             self.pausable.assert_not_paused();
 
             let player = get_caller_address();
@@ -428,6 +433,10 @@ pub mod CrashGame {
             self.casino_fee_basis_points.read()
         }
 
+        fn get_min_bet(self: @ContractState) -> u256 {
+            self.min_bet.read()
+        }
+
         fn set_max_bet(ref self: ContractState, max_bet: u256) {
             self.ownable.assert_only_owner();
             self.max_bet.write(max_bet)
@@ -438,15 +447,16 @@ pub mod CrashGame {
             self.max_amount_of_bets.write(max_amount_of_bets)
         }
 
+        fn set_min_bet(ref self: ContractState, min_bet: u256) {
+            self.ownable.assert_only_owner();
+            assert(min_bet < self.max_bet.read(), 'Min bet must be <= max bet');
+            self.min_bet.write(min_bet)
+        }
+
         fn set_casino_fee_basis_points(ref self: ContractState, casino_fee_basis_points: u256) {
             self.ownable.assert_only_owner();
             assert(casino_fee_basis_points <= 600, 'Casino fee must be <= 600');
             self.casino_fee_basis_points.write(casino_fee_basis_points);
-        }
-
-        fn set_operator(ref self: ContractState, operator: ContractAddress) {
-            self.ownable.assert_only_owner();
-            self.ownable.transfer_ownership(operator);
         }
 
         fn set_casino_address(ref self: ContractState, casino_address: ContractAddress) {
