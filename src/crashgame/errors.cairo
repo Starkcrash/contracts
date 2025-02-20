@@ -9,4 +9,5 @@ pub mod Errors {
     pub const INVALID_SEED: felt252 = 'Invalid seed';
     pub const AMOUNT_EXCEEDS_MAX_BET: felt252 = 'Bet amount exceeds max bet';
     pub const TOTAL_BET_EXCEEDS_MAX_BET: felt252 = 'Total bet exceeds x max bet';
+    pub const AMOUNT_BELOW_MIN_BET: felt252 = 'Amount below minimum bet';
 }

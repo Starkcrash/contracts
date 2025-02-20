@@ -216,6 +216,44 @@ fn test_place_bet_fail_max_bet() {
 
 #[test]
 #[fork(url: "https://starknet-sepolia.public.blastapi.io/rpc/v0_7", block_tag: latest)]
+#[should_panic(expected: 'Amount below minimum bet')]
+fn test_place_bet_fail_min_bet() {
+    // Setup initial game state
+    let (dispatcher, _, _, _) = setup_start_betting();
+    let game_id = dispatcher.get_current_game();
+    let amount: u128 = 1_000_000_000_0;
+    let amount_u256: u256 = amount.into();
+    // Setup player address
+    let player = PLAYER_ADDRESS();
+    // Setup ETH token and give balance to player using cheatcode
+    let eth = ERC20ABIDispatcher { contract_address: ETH_ADDRESS() };
+    store(
+        eth.contract_address,
+        map_entry_address(
+            selector!("ERC20_balances"), // Providing variable name
+            array![player.into()].span() // Providing mapping key
+        ),
+        array![amount.into() * 2].span(),
+    );
+    let bal_player_before = eth.balance_of(player);
+    assert(bal_player_before == (amount * 2).into(), 'Player balance mismatch');
+
+    // Verify game state is still betting
+    let game_state = dispatcher.get_game_state(game_id);
+    assert(game_state == GameState::Betting, 'Game state not betting');
+
+    start_cheat_caller_address(eth.contract_address, player);
+    eth.approve(dispatcher.contract_address, amount.into());
+    stop_cheat_caller_address(eth.contract_address);
+
+    // Place bet as player
+    start_cheat_caller_address(dispatcher.contract_address, player);
+    dispatcher.place_bet(game_id, amount_u256);
+    stop_cheat_caller_address(dispatcher.contract_address);
+}
+
+#[test]
+#[fork(url: "https://starknet-sepolia.public.blastapi.io/rpc/v0_7", block_tag: latest)]
 fn test_cashout() {
     // Setup initial game state
     let (dispatcher, management, _, secret_seed) = setup_start_betting();
