@@ -23,8 +23,6 @@ pub trait IManagement<TContractState> {
     fn get_max_bet(self: @TContractState) -> u256;
     fn set_max_bet(ref self: TContractState, max_bet: u256);
     fn set_casino_address(ref self: TContractState, casino_address: ContractAddress);
-    fn get_max_amount_of_bets(self: @TContractState) -> u8;
-    fn set_max_amount_of_bets(ref self: TContractState, max_amount_of_bets: u8);
     fn get_casino_fee(self: @TContractState) -> u256;
     fn set_casino_fee_basis_points(ref self: TContractState, casino_fee_basis_points: u256);
     fn get_min_bet(self: @TContractState) -> u256;
@@ -86,7 +84,6 @@ pub mod CrashGame {
         committed_seeds: Map::<u64, felt252>,
         revealed_seeds: Map::<u64, felt252>,
         max_bet: u256,
-        max_amount_of_bets: u8,
         casino_fee_basis_points: u256,
         min_bet: u256,
     }
@@ -147,10 +144,9 @@ pub mod CrashGame {
         self.ownable.initializer(operator);
         self.casino_address.write(casino_address);
         self.game_states.write(0, GameState::Transition);
-        self.max_bet.write(1_000_000_000_000_000_0); // 0.01 ETH by default
-        self.max_amount_of_bets.write(2);
+        self.max_bet.write(10_000_000_000_000_000); // 0.01 ETH by default
         self.casino_fee_basis_points.write(0);
-        self.min_bet.write(100_000_000_000_000); // 0.00001 ETH by default
+        self.min_bet.write(100_000_000_000_000); // 0.0001 ETH by default
     }
 
     #[generate_trait]
@@ -362,10 +358,7 @@ pub mod CrashGame {
 
             let existing_bet = self.player_bets.read((game_id, player));
             let total_bet = existing_bet + amount;
-            assert(
-                total_bet <= self.max_bet.read() * self.max_amount_of_bets.read().into(),
-                Errors::TOTAL_BET_EXCEEDS_MAX_BET,
-            );
+            assert(total_bet <= self.max_bet.read(), Errors::TOTAL_BET_EXCEEDS_MAX_BET,);
             // Store bet
             self.player_bets.write((game_id, player), total_bet);
             self.processed.write((game_id, player), false);
@@ -425,10 +418,6 @@ pub mod CrashGame {
             self.max_bet.read()
         }
 
-        fn get_max_amount_of_bets(self: @ContractState) -> u8 {
-            self.max_amount_of_bets.read()
-        }
-
         fn get_casino_fee(self: @ContractState) -> u256 {
             self.casino_fee_basis_points.read()
         }
@@ -440,11 +429,6 @@ pub mod CrashGame {
         fn set_max_bet(ref self: ContractState, max_bet: u256) {
             self.ownable.assert_only_owner();
             self.max_bet.write(max_bet)
-        }
-
-        fn set_max_amount_of_bets(ref self: ContractState, max_amount_of_bets: u8) {
-            self.ownable.assert_only_owner();
-            self.max_amount_of_bets.write(max_amount_of_bets)
         }
 
         fn set_min_bet(ref self: ContractState, min_bet: u256) {
