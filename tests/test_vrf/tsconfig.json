@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    /* Base Options */
+    "esModuleInterop": true, // Enables compatibility with CommonJS modules
+    "skipLibCheck": true, // Skip type checking of declaration files
+    "target": "ES2022", // Target modern ECMAScript features
+    "allowJs": true, // Allow JavaScript files to be compiled
+    "resolveJsonModule": true, // Include modules imported with .json extension
+    "moduleDetection": "force", // Treat files as modules even without imports/exports
+
+    /* Strict Type-Checking Options */
+    "strict": true, // Enable all strict type-checking options
+    "noImplicitAny": true, // Raise error on expressions and declarations with an implied 'any' type
+
+    /* Module Resolution Options */
+    "module": "NodeNext", // Use Node.js ESM-compliant module system
+    "moduleResolution": "NodeNext", // Use Node.js ESM module resolution strategy
+    // "baseUrl": ".", // Base directory to resolve non-absolute module names
+    // "paths": {}, // Specify path mapping relative to baseUrl
+
+    /* Source Map Options */
+    // "sourceMap": true, // Generate corresponding .map file
+    // "outDir": "./dist", // Redirect output structure to the directory
+
+    /* Other Options */
+    "forceConsistentCasingInFileNames": true // Disallow inconsistently-cased references to the same file
+  },
+  "include": [
+    "**/*.ts" // Include all .ts files in the current directory and subdirectories
+  ],
+  "exclude": [
+    "node_modules" // Exclude the node_modules directory
+  ]
+} 

@@ -2,3 +2,4 @@ target
 .snfoundry_cache/
 .env
 scripts/**/*.json
+tests/test_vrf/node_modules/

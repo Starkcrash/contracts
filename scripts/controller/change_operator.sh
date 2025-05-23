@@ -6,8 +6,8 @@ source ../.env
 echo "Setting new operator..."
 INVOKE_OUTPUT=$(sncast --account $ACCOUNT_NAME invoke \
     --url "$RPC_URL" \
-    --contract-address "$CONTRACT_ADDRESS" \
-    --function "set_operator" \
+    --contract-address "$CONTROLLER_CONTRACT_ADDRESS" \
+    --function "transfer_ownership" \
     --calldata "$OPERATOR_ADDRESS" \
     --fee-token "$FEE_TOKEN")
 
