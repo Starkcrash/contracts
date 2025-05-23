@@ -1,27 +1,31 @@
 [package]
-name = "crash_contracts"
+name = "raindinner_contracts"
 version = "0.1.0"
 edition = "2023_11"
 
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-starknet = "2.9.1"
-openzeppelin = "0.20.0"
-openzeppelin_security = "0.20.0"
-openzeppelin_access = "0.20.0"
-openzeppelin_token = "0.20.0"
-
+starknet = "2.11.2"
+openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v2.0.0-alpha.0" }
+openzeppelin_security = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v2.0.0-alpha.0" }
+openzeppelin_access = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v2.0.0-alpha.0" }
+openzeppelin_token = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v2.0.0-alpha.0" }
+openzeppelin_utils = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v2.0.0-alpha.0" }
+alexandria_data_structures = {git = "https://github.com/keep-starknet-strange/alexandria.git", rev = "35a2a6d"}
+cartridge_vrf = {git = "https://github.com/Tbelleng/vrf.git"}
 
 [dev-dependencies]
-snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.32.0" }
+snforge_std = "0.41.0" 
+assert_macros = "2.11.2"
 
-assert_macros = "2.8.4"
+[patch.crates-io]
+openzeppelin_introspection = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v2.0.0-alpha.0" }
 
 
 [[target.starknet-contract]]
 sierra = true
-
+casm = true
 [scripts]
 test = "snforge test"
 
