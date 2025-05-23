@@ -6,17 +6,17 @@ set -e
 source ../.env
 
 # Check if NEW_CLASS_HASH is set
-if [ -z "$CLASS_HASH" ]; then
-    echo "Error: CLASS_HASH is not set in .env"
+if [ -z "$CRASH_CLASS_HASH" ]; then
+    echo "Error: CRASH_CLASS_HASH is not set in .env"
     exit 1
 fi
 
 echo "Upgrading contract..."
 INVOKE_OUTPUT=$(sncast --account $ACCOUNT_NAME invoke \
     --url "$RPC_URL" \
-    --contract-address "$CONTRACT_ADDRESS" \
+    --contract-address "$CRASH_CONTRACT_ADDRESS" \
     --function "upgrade" \
-    --calldata "$CLASS_HASH" \
+    --calldata "$CRASH_CLASS_HASH" \
     --fee-token "$FEE_TOKEN")
 
 # Extract transaction hash
@@ -27,4 +27,4 @@ if [ -z "$TX_HASH" ]; then
     exit 1
 fi
 
-echo "New upgrade transaction hash: $TX_HASH"
+echo "✓ New upgrade transaction hash: $TX_HASH"
